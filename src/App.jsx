@@ -1,27 +1,37 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import Spotify from './util/Spotify'
 import './App.css'
 import SearchBar from './components/SearchBar/SearchBar'
 import SearchResults from './components/SearchResults/SearchResults'
 import Playlist from './components/Playlist/Playlist'
-
-const sampleTracks = [
-  { id: 1, name: 'Song One', artist: 'Artist A', album: 'Album X' },
-  { id: 2, name: 'Song Two', artist: 'Artist B', album: 'Album Y' },
-  { id: 3, name: 'Song Three', artist: 'Artist C', album: 'Album Z' },
-]
 
 function App() {
   const [searchResults, setSearchResults] = useState([])
   const [playlistName, setPlaylistName] = useState('New Playlist')
   const [playlistTracks, setPlaylistTracks] = useState([])
 
-  const search = (term) => {
-    const t = term.trim().toLowerCase()
-    setSearchResults(
-      sampleTracks.filter((s) =>
-        [s.name, s.artist, s.album].some((f) => f.toLowerCase().includes(t))
-      )
-    )
+  const [error, setError] = useState(() => {
+    const loginError = new URLSearchParams(window.location.search).get('error')
+    return loginError ? `Spotify login failed: ${loginError}` : ''
+  })
+
+  // Completes the Spotify login when returning from the redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.has('error')) {
+      window.history.replaceState({}, document.title, window.location.pathname)
+    } else if (params.has('code')) {
+      Spotify.getAccessToken().catch((e) => setError(e.message))
+    }
+  }, [])
+
+  const search = async (term) => {
+    setError('')
+    try {
+      setSearchResults(await Spotify.search(term.trim()))
+    } catch (e) {
+      setError(e.message)
+    }
   }
 
   const addTrack = (track) => {
@@ -42,6 +52,7 @@ function App() {
     <div>
       <h1>Ja<span className="highlight">mmm</span>ing</h1>
       <SearchBar onSearch={search} />
+      {error && <p role="alert">{error}</p>}
       <div className="App-playlist">
         <SearchResults tracks={searchResults} onAdd={addTrack} />
         <Playlist
